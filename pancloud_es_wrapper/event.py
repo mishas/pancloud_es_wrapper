@@ -141,6 +141,8 @@ class EventService(object):
                         "maxWaitTime": 0  # no logs in initial response
                     }, **kwargs)
 
+                    q.raise_for_status()
+
                     for res in self._logging_service.xpoll(q.json()["queryId"], sequence_no=0):
                         if not self._is_new(res["_id"]):
                             continue
@@ -164,6 +166,8 @@ class EventService(object):
             "endTime": THE_FUTURE,
             "maxWaitTime": 0,
         })
+
+        q.raise_for_status()
 
         for result in self._logging_service.iter_poll(q.json()["queryId"], sequence_no=0):
             for bucket in (result.json()
