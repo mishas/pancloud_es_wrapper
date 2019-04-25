@@ -170,14 +170,11 @@ class EventService(object):
         q.raise_for_status()
 
         for result in self._logging_service.iter_poll(q.json()["queryId"], sequence_no=0):
-            for bucket in (result.json()
-                           .get("result", {})
-                           .get("esResult", {})
-                           .get("response", {})
-                           .get("result", {})
-                           .get("aggregations", {})
-                           .get("serial", {})
-                           .get("buckets", {})):
+            try:
+                buckets = result.json()["result"]["esResult"]["response"]["result"]["aggregations"]["serial"]["buckets"]
+            except KeyError:
+                raise pancloud.PanCloudError('no "buckets" in response: %s' % result.json())
+            for bucket in buckets:
                 yield bucket["key"]
 
     def _is_new(self, res_id):
