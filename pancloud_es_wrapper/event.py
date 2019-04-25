@@ -173,7 +173,7 @@ class EventService(object):
         for result in self._logging_service.iter_poll(q.json()["queryId"], sequence_no=0):
             try:
                 buckets = result.json()["result"]["esResult"]["response"]["result"]["aggregations"]["serial"]["buckets"]
-            except KeyError:
+            except (KeyError, TypeError):  # Sometimes result.json()["result"] returns None for some reason.
                 raise pancloud.PanCloudError('no "buckets" in response: %s' % result.json())
             for bucket in buckets:
                 yield bucket["key"]
