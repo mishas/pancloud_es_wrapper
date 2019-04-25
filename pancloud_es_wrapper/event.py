@@ -145,7 +145,7 @@ class EventService(object):
 
                     q.raise_for_status()
 
-                    for res in self._logging_service.xpoll(q.json()["queryId"], sequence_no=0):
+                    for res in self._logging_service.xpoll(q.json()["queryId"], sequence_no=0, delete_query=False):
                         if not self._is_new(res["_id"]):
                             continue
                         res["_source"]["serial"] = serial
