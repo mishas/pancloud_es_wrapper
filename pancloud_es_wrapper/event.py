@@ -97,12 +97,14 @@ class EventService(object):
         Generator function to return logType, event entries from poll
         API request.
 
+        NOTE: The pause argument differs in behaviour from the original EventService.
+
         Args:
             channel_id (str): The channel ID.
             json (dict): Payload/request body.
             ack (bool): True to acknowledge read.
             follow (bool): True to continue polling after channelId empty.
-            pause (float): Seconds to sleep between poll when follow and channelId empty.
+            pause (float): Seconds to sleep between poll.
             **kwargs: Supported :meth:`~pancloud.httpclient.HTTPClient.request` parameters.
 
         Yields:
@@ -153,10 +155,9 @@ class EventService(object):
             if not returned:
                 if not follow:
                     return
-                if pause is not None:
-                    self._debug('sleep %.2fs', pause)
-                    time.sleep(pause)
-
+            if pause is not None:
+                self._debug('sleep %.2fs', pause)
+                time.sleep(pause)
 
 
     def _get_serials(self):
