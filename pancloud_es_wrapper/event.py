@@ -171,9 +171,11 @@ class EventService(object):
         q.raise_for_status()
 
         for result in self._logging_service.iter_poll(q.json()["queryId"], sequence_no=0):
+            if result.json()['queryStatus'] == 'RUNNING':
+                continue
             try:
                 buckets = result.json()["result"]["esResult"]["response"]["result"]["aggregations"]["serial"]["buckets"]
-            except (KeyError, TypeError):  # Sometimes result.json()["result"] returns None for some reason.
+            except KeyError:
                 raise pancloud.PanCloudError('no "buckets" in response: %s' % result.json())
             for bucket in buckets:
                 yield bucket["key"]
