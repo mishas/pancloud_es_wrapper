@@ -117,40 +117,29 @@ class EventService(object):
         queries = {}
         for filt in filters:
             ((k, v),) = filt.items()
-            if "WHERE" in v["filter"].upper() or "LIMIT" in v["filter"].upper():
-                raise UnsupportedAction("This wrapper does not support EventService filters with WHERE clause")
+            if "LIMIT" in v["filter"].upper():
+                raise UnsupportedAction("This wrapper does not support EventService filters with LIMIT clause")
             queries[k] = v["filter"]
 
-        last_serials_update = 0
-        serials = set()
-
         while True:
-            if time.monotonic() - SERIAL_UPDATE_INTERVAL_SECS > last_serials_update:
-                last_serials_update = time.monotonic()
-                serials.update(self._get_serials())
-                self._debug("Serials set: %s", serials)
-
             start_time = int(time.time()) - QUERY_OVERLAP
 
             returned = False
             for key, query_string in queries.items():
-                for serial in serials:
-                    q = self._logging_service.query({
-                        "query": "%s WHERE serial='%s' LIMIT %s" % (
-                            query_string.replace("`", ""), serial, MAX_CACHE_SIZE),
-                        "startTime": start_time,
-                        "endTime": THE_FUTURE,
-                        "maxWaitTime": 0  # no logs in initial response
-                    }, **kwargs)
+                q = self._logging_service.query({
+                    "query": "%s LIMIT %s" % (query_string.replace("`", ""), MAX_CACHE_SIZE),
+                    "startTime": start_time,
+                    "endTime": THE_FUTURE,
+                    "maxWaitTime": 0  # no logs in initial response
+                }, **kwargs)
 
-                    q.raise_for_status()
+                q.raise_for_status()
 
-                    for res in self._logging_service.xpoll(q.json()["queryId"], sequence_no=0, delete_query=False):
-                        if not self._is_new(res["_id"]):
-                            continue
-                        res["_source"]["serial"] = serial
-                        returned = True
-                        yield {"logType": key, "event": [res["_source"]]}
+                for res in self._logging_service.xpoll(q.json()["queryId"], sequence_no=0, delete_query=False):
+                    if not self._is_new(res["_id"]):
+                        continue
+                    returned = True
+                    yield {"logType": key, "event": [res["_source"]]}
 
             if not returned:
                 if not follow:
@@ -158,27 +147,6 @@ class EventService(object):
             if pause is not None:
                 self._debug('sleep %.2fs', pause)
                 time.sleep(pause)
-
-
-    def _get_serials(self):
-        q = self._logging_service.query({
-            "query": "SELECT COUNT(*) FROM panw.trsum GROUP BY serial, device_name WITH LIMIT 50 LIMIT 0",
-            "startTime": int(time.time()) - 24 * 60 * 60,  # Last day
-            "endTime": THE_FUTURE,
-            "maxWaitTime": 0,
-        })
-
-        q.raise_for_status()
-
-        for result in self._logging_service.iter_poll(q.json()["queryId"], sequence_no=0):
-            if result.json()['queryStatus'] == 'RUNNING':
-                continue
-            try:
-                buckets = result.json()["result"]["esResult"]["response"]["result"]["aggregations"]["serial"]["buckets"]
-            except KeyError:
-                raise pancloud.PanCloudError('no "buckets" in response: %s' % result.json())
-            for bucket in buckets:
-                yield bucket["key"]
 
     def _is_new(self, res_id):
         if res_id in self._returned_items:
